@@ -4,24 +4,18 @@ This repository contains all information about the SC7Pilot.
 ## All source-code repositories of the SC7Pilot:
 
 ### Change Detection workflow
-Image Aggregator: https://github.com/big-data-europe/pilot-sc7-image-aggregator
-
+Image Aggregator: https://github.com/big-data-europe/pilot-sc7-image-aggregator  
 Change Detector: https://github.com/big-data-europe/pilot-sc7-change-detector
 
 ### Event Detection workflow
-Event Detector: https://github.com/npit/bde-event-detection-sc7
-
+Event Detector: https://github.com/npit/bde-event-detection-sc7  
 Lookup Service: https://github.com/big-data-europe/pilot-sc7-lookup-service
 
 ### Activation workflow
-Sextant:  http://hg.strabon.di.uoa.gr/Sextant-New
-
-Event Retrieve: https://github.com/big-data-europe/BigDataEurope-EventDetectionService
-
-SemaGrow: https://github.com/semagrow/semagrow
-
-Strabon: http://hg.strabon.di.uoa.gr/Strabon
-
+Sextant:  http://hg.strabon.di.uoa.gr/Sextant-New  
+Event Retrieve: https://github.com/big-data-europe/BigDataEurope-EventDetectionService  
+SemaGrow: https://github.com/semagrow/semagrow  
+Strabon: http://hg.strabon.di.uoa.gr/Strabon  
 GeoTriples (as Web Service): https://github.com/big-data-europe/pilot-sc7-geotriples
 
 
