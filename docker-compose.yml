@@ -1,0 +1,479 @@
+version: '2.1'
+services:
+
+  sextant:
+    image: bde2020/sextant:3.1.6
+    hostname: sextant
+    container_name: sextant
+    environment:
+      - "constraint:node==slave1"
+    ports:
+      - "8191:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    depends_on:
+      eventretrieve:
+        condition: service_healthy
+    depends_on:
+      aggregatordetector:
+        condition: service_healthy
+    networks:
+      - default
+
+  postgres:
+    image: bde2020/postgres:1.1.0
+    hostname: postgres
+    container_name: postgres
+    environment:
+      - "constraint:node!=master"
+    volumes:
+      - /srv/postgres110:/var/lib/postgresql/9.4/main
+    healthcheck:
+      test: ["CMD", "su", "postgres", "-c", "pg_isready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - default
+
+  eventretrieve:
+    image: bde2020/eventretrieve:1.0.0
+    hostname: eventretrieve
+    container_name: eventretrieve
+    environment:
+      - "constraint:node!=master"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/eventDetection/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    expose:
+      - "8000"
+    depends_on:
+      semagrow_bde:
+        condition: service_healthy
+    networks:
+      - default
+
+  semagrow_bde:
+    image: semagrow/semagrow-cassandra
+    hostname: semagrow_bde
+    container_name: semagrow_bde
+    environment:
+      - "constraint:node!=master"
+    volumes:
+      - /home/gioargyr/SC7Pilot/semagrow:/etc/default/semagrow
+    ports:
+      - "8393:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/SemaGrow/"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    expose:
+      - "8080"
+    depends_on:
+      strabon:
+        condition: service_healthy
+    networks:
+      - default
+
+  geotriples:
+    image: bde2020/geotriples-ws:1.1.2
+    hostname: geotriples
+    container_name: geotriples
+    environment:
+      - "affinity:container==strabon"
+    volumes:
+      - /home/gioargyr/SC7Pilot/geostrabon:/resources
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    expose:
+      - "8080"
+    depends_on:
+      strabon:
+        condition: service_healthy
+    networks:
+      - default
+
+  strabon:
+    image: bde2020/strabon:1.0.0
+    hostname: strabon
+    container_name: strabon
+    environment:
+      - "constraint:node!=master"
+    volumes:
+      - /home/gioargyr/SC7Pilot/geostrabon:/resources
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    expose:
+      - "8080"
+    depends_on:
+      postgis:
+        condition: service_healthy
+    networks:
+      - default
+
+  postgis:
+    image: bde2020/postgis
+    hostname: postgis
+    container_name: postgis
+    environment:
+      - "constraint:node!=master"
+    volumes:
+      - /srv/postgis:/var/lib/postgresql/9.4/main
+    healthcheck:
+      test: ["CMD", "su", "postgres", "-c", "pg_isready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - default
+
+  aggregatordetector:
+    image: bde2020/aggregatordetector:2.0.2
+    hostname: aggregatordetector
+    container_name: aggregatordetector
+    environment:
+      - "affinity:container==spark-master-sc7"
+    volumes:
+      - /home/gioargyr/SC7Pilot/aggregatordetector:/snap
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    expose:
+      - "8080"
+    depends_on:
+      worker1:
+        condition: service_healthy
+    depends_on:
+      worker2:
+        condition: service_healthy
+    depends_on:
+      worker3:
+        condition: service_healthy
+    networks:
+      - default
+
+  spark-master-sc7:
+    image: bde2020/spark-master:1.6.2-hadoop2.6
+    hostname: spark-master-sc7
+    container_name: spark-master-sc7
+    environment:
+      - "constraint:node==slave2"
+    ports:
+      - "8294:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "8080"
+    depends_on:
+      datanode1:
+        condition: service_healthy
+    depends_on:
+      datanode2:
+        condition: service_healthy
+    depends_on:
+      datanode3:
+        condition: service_healthy
+    depends_on:
+      datanode4:
+        condition: service_healthy
+    networks:
+      - default
+
+  worker1:
+    image: bde2020/pilot-sc7-spark-worker
+    container_name: worker1
+    mem_limit: 16g
+    environment:
+      - SPARK_MASTER=spark://spark-master-sc7:7077
+      - "constraint:node!=slave2"
+      - "affinity:container!=worker*"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "8081"
+    depends_on:
+      spark-master-sc7:
+        condition: service_healthy
+    networks:
+      - default
+
+  worker2:
+    image: bde2020/pilot-sc7-spark-worker
+    container_name: worker2
+    mem_limit: 16g
+    environment:
+      - SPARK_MASTER=spark://spark-master-sc7:7077
+      - "constraint:node!=slave2"
+      - "affinity:container!=worker*"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "8081"
+    depends_on:
+      spark-master-sc7:
+        condition: service_healthy
+    networks:
+      - default
+
+  worker3:
+    image: bde2020/pilot-sc7-spark-worker
+    container_name: worker3
+    mem_limit: 16g
+    environment:
+      - SPARK_MASTER=spark://spark-master-sc7:7077
+      - "constraint:node!=slave2"
+      - "affinity:container!=worker*"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "8081"
+    depends_on:
+      spark-master-sc7:
+        condition: service_healthy
+    networks:
+      - default
+
+  namenode:
+    image: bde2020/hadoop-namenode:1.0.0
+    hostname: namenode
+    container_name: namenode
+    environment:
+      - "constraint:node==master"
+      - CLUSTER_NAME=hcluster
+    env_file:
+      - /home/gioargyr/SC7Pilot/hadoop/hadoop.env
+    volumes:
+      - /srv/hadoop/data:/hadoop/dfs/name
+    ports:
+      - "8293:50070"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50070"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "50070"
+    networks:
+      - default
+
+  datanode1:
+    image: bde2020/hadoop-datanode:1.0.0
+    container_name: datanode1
+    environment:
+      - "affinity:container!=datanode*"
+      - "constraint:node!=master"
+    env_file:
+      - /home/gioargyr/SC7Pilot/hadoop/hadoop.env
+    volumes:
+      - /srv/hadoop/data:/hadoop/dfs/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50075"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "50075"
+    depends_on:
+      namenode:
+        condition: service_healthy
+    networks:
+      - default
+
+  datanode2:
+    image: bde2020/hadoop-datanode:1.0.0
+    container_name: datanode2
+    environment:
+      - "affinity:container!=datanode*"
+      - "constraint:node!=master"
+    env_file:
+      - /home/gioargyr/SC7Pilot/hadoop/hadoop.env
+    volumes:
+      - /srv/hadoop/data:/hadoop/dfs/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50075"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "50075"
+    depends_on:
+      namenode:
+        condition: service_healthy
+    networks:
+      - default
+
+  datanode3:
+    image: bde2020/hadoop-datanode:1.0.0
+    container_name: datanode3
+    environment:
+      - "affinity:container!=datanode*"
+      - "constraint:node!=master"
+    env_file:
+      - /home/gioargyr/SC7Pilot/hadoop/hadoop.env
+    volumes:
+      - /srv/hadoop/data:/hadoop/dfs/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50075"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "50075"
+    depends_on:
+      namenode:
+        condition: service_healthy
+    networks:
+      - default
+
+  datanode4:
+    image: bde2020/hadoop-datanode:1.0.0
+    container_name: datanode4
+    environment:
+      - "affinity:container!=datanode*"
+      - "constraint:node!=master"
+    env_file:
+      - /home/gioargyr/SC7Pilot/hadoop/hadoop.env
+    volumes:
+      - /srv/hadoop/data:/hadoop/dfs/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:50075"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "50075"
+    depends_on:
+      namenode:
+        condition: service_healthy
+    networks:
+      - default
+
+  lookupservice:
+    image: bde2020/lookupservice:1.0.1
+    hostname: lookupservice
+    container_name: lookupservice
+    environment:
+      - "constraint:node!=master"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "8080"
+    networks:
+      - default
+
+  cassandra-cluster-1:
+    image: bde2020/cassandra
+    container_name: cassandra-cluster-1
+    environment:
+      - "CASSANDRA_BROADCAST_ADDRESS=cassandra-cluster-1"
+      - "constraint:node!=master"
+      - "affinity:container!=cassandra-cluster-*"
+    restart: always
+    healthcheck:
+      test: ["CMD", "nodetool", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - default
+
+  cassandra-cluster-2:
+    image: bde2020/cassandra
+    container_name: cassandra-cluster-2
+    environment:
+      - "CASSANDRA_BROADCAST_ADDRESS=cassandra-cluster-2"
+      - "CASSANDRA_SEEDS=cassandra-cluster-1"
+      - "constraint:node!=master"
+      - "affinity:container!=cassandra-cluster-*"
+    restart: always
+    healthcheck:
+      test: ["CMD", "nodetool", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      cassandra-cluster-1:
+        condition: service_healthy
+    networks:
+      - default
+
+  cassandra-cluster-3:
+    image: bde2020/cassandra
+    container_name: cassandra-cluster-3
+    environment:
+      - "CASSANDRA_BROADCAST_ADDRESS=cassandra-cluster-3"
+      - "CASSANDRA_SEEDS=cassandra-cluster-1"
+      - "constraint:node!=master"
+      - "affinity:container!=cassandra-cluster-*"
+    restart: always
+    healthcheck:
+      test: ["CMD", "nodetool", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      cassandra-cluster-2:
+        condition: service_healthy
+    networks:
+      - default
+
+  cassandra-cluster-4:
+    image: bde2020/cassandra
+    container_name: cassandra-cluster-4
+    environment:   
+      - "CASSANDRA_BROADCAST_ADDRESS=cassandra-cluster-4"
+      - "CASSANDRA_SEEDS=cassandra-cluster-1"
+      - "constraint:node!=master"
+      - "affinity:container!=cassandra-cluster-*"
+    restart: always
+    ports:
+      - 9042:9042
+    healthcheck:
+      test: ["CMD", "nodetool", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      cassandra-cluster-2:
+        condition: service_healthy
+    networks:
+      - default
+
+networks:
+  default:
+    external:
+      name: sc7_net
